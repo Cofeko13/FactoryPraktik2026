@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кредитный документооборот: Автозаполнение</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #2C3E4E;
+            font-family: system-ui, 'Segoe UI', 'Roboto', sans-serif;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 40px;
+        }
+
+        .header-tabs {
+            background-color: #FFFFFF;
+            border-radius: 8px;
+            margin-top: 24px;
+            margin-bottom: 32px;
+            padding: 0 8px;
+        }
+
+        .tab-list {
+            display: flex;
+            flex-wrap: wrap;
+            list-style: none;
+            gap: 4px;
+            padding: 8px 0;
+        }
+
+        .tab-item {
+            padding: 12px 28px;
+            font-weight: 600;
+            font-size: 1rem;
+            background-color: #B0C4DE;
+            color: #000000;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: none;
+            border: none;
+        }
+
+        .tab-item.active {
+            background-color: #4682B4;
+            color: #FFFFFF;
+        }
+
+        .show-all-item {
+            padding: 12px 28px;
+            font-weight: 600;
+            font-size: 1rem;
+            background-color: #6495ED;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            border: none;
+            transition: none;
+        }
+
+        main {
+            margin-bottom: 60px;
+        }
+
+        .form-card {
+            background-color: #FFFFFF;
+            border-radius: 8px;
+            padding: 32px 40px 44px 40px;
+        }
+
+        .form-title {
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 28px;
+            color: #1F2E38;
+            border-left: 5px solid #4682B4;
+            padding-left: 20px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px 32px;
+            margin-bottom: 24px;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field-group label {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #000000;
+        }
+
+        .field-group input,
+        .field-group select,
+        .field-group textarea {
+            background-color: #FFFFFF;
+            border: 1px solid #B0C4DE;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 0.95rem;
+            color: #000000;
+            font-family: inherit;
+            width: 100%;
+        }
+
+        .field-group textarea {
+            resize: vertical;
+            min-height: 70px;
+        }
+
+        .section-divider {
+            margin: 16px 0 20px 0;
+            border-top: 2px solid #B0C4DE;
+            opacity: 0.7;
+        }
+
+        .tab-section {
+            display: block;
+        }
+
+        .tab-section.hidden {
+            display: none;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 20px;
+            justify-content: flex-start;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: none;
+            background-color: #6495ED;
+            color: white;
+            font-weight: 600;
+            padding: 12px 28px;
+            font-size: 0.95rem;
+            border-radius: 8px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: none;
+        }
+
+        .btn-secondary {
+            background-color: #B0C4DE;
+            color: #000000;
+        }
+
+        .btn-exit {
+            background-color: #4682B4;
+            color: white;
+        }
+
+        footer {
+            border-top: 1px solid rgba(255,255,255,0.2);
+            padding: 24px 0 32px;
+            text-align: center;
+            color: #E8F0F8;
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 800px) {
+            .container {
+                padding: 0 20px;
+            }
+            .form-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            .full-width {
+                grid-column: span 1;
+            }
+            .tab-item, .show-all-item {
+                padding: 8px 14px;
+                font-size: 0.85rem;
+            }
+            .form-card {
+                padding: 20px;
+            }
+            .tab-list {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 550px) {
+            .button-group {
+                flex-direction: column;
+                width: 100%;
+            }
+            .btn {
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="header-tabs">
+            <ul class="tab-list">
+                <li class="tab-item active" data-tab="tab1">Личные данные</li>
+                <li class="tab-item" data-tab="tab2">Паспорт и адрес</li>
+                <li class="tab-item" data-tab="tab3">ИНН/СНИЛС</li>
+                <li class="tab-item" data-tab="tab4">Работа и доходы</li>
+                <li class="tab-item" data-tab="tab5">Кредитные параметры</li>
+                <li class="tab-item" data-tab="tab6">Обеспечение и поручители</li>
+                <li class="tab-item" data-tab="tab7">Банк</li>
+                <li class="show-all-item" id="showAllBtn">Показать всё</li>
+            </ul>
+        </div>
+    </header>
+
+    <main>
+        <div class="form-card">
+            <h2 class="form-title">Автоматическое заполнение кредитных документов</h2>
+
+            <form id="mainForm">
+                <div id="tab1" class="tab-section">
+                    <div class="form-grid">
+                        <div class="field-group">
+                            <label>Фамилия *</label>
+                            <input type="text" name="lastname" placeholder="ФИО должно содержать только буквы и пробелы">
+                        </div>
+                        <div class="field-group">
+                            <label>Имя *</label>
+                            <input type="text" name="firstname" placeholder="ФИО должно содержать только буквы и пробелы">
+                        </div>
+                        <div class="field-group">
+                            <label>Отчество</label>
+                            <input type="text" name="middlename" placeholder="ФИО должно содержать только буквы и пробелы">
+                        </div>
+                        <div class="field-group">
+                            <label>Дата рождения *</label>
+                            <input type="date" name="birthdate" placeholder="Укажите корректную дату рождения">
+                        </div>
+                        <div class="field-group">
+                            <label>Место рождения</label>
+                            <input type="text" name="birth_place">
+                        </div>
+                        <div class="field-group">
+                            <label>Гражданство</label>
+                            <input type="text" name="citizenship">
+                        </div>
+                        <div class="field-group">
+                            <label>Семейное положение</label>
+                            <select name="marital_status">
+                                <option value="">Выберите</option>
+                                <option value="холост/не замужем">Холост/Не замужем</option>
+                                <option value="женат/замужем">Женат/Замужем</option>
+                                <option value="разведен(а)">Разведен(а)</option>
+                                <option value="вдовец/вдова">Вдовец/Вдова</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab2" class="tab-section hidden">
+                    <div class="form-grid">
+                        <div class="field-group">
+                            <label>Вид документа</label>
+                            <input type="text" name="doc_type" value="Паспорт гражданина РФ">
+                        </div>
+                        <div class="field-group">
+                            <label>Серия паспорта</label>
+                            <input type="text" name="passport_series" maxlength="4">
+                        </div>
+                        <div class="field-group">
+                            <label>Номер паспорта</label>
+                            <input type="text" name="passport_number">
+                        </div>
+                        <div class="field-group">
+                            <label>Дата выдачи паспорта</label>
+                            <input type="date" name="passport_issue_date">
+                        </div>
+                        <div class="field-group">
+                            <label>Кем выдан паспорт</label>
+                            <input type="text" name="issued_by">
+                        </div>
+                        <div class="field-group">
+                            <label>Код подразделения</label>
+                            <input type="text" name="department_code" placeholder="Код подразделения должен быть в формате xxx-xxx">
+                        </div>
+                        <div class="field-group full-width">
+                            <label>Адрес регистрации</label>
+                            <input type="text" name="registration_address">
+                        </div>
+                        <div class="field-group full-width">
+                            <label>Фактический адрес</label>
+                            <input type="text" name="factual_address">
+                        </div>
+                        <div class="field-group">
+                            <label>Телефон</label>
+                            <input type="tel" name="phone">
+                        </div>
+                        <div class="field-group">
+                            <label>E-mail</label>
+                            <input type="email" name="email">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab3" class="tab-section hidden">
+                    <div class="form-grid">
+                        <div class="field-group">
+                            <label>ИНН</label>
+                            <input type="text" name="inn" maxlength="12" placeholder="ИНН должен состоять из 12 цифр">
+                        </div>
+                        <div class="field-group">
+                            <label>СНИЛС</label>
+                            <input type="text" name="snils" placeholder="СНИЛС должен быть в формате xxx-xxx-xxx xx">
+                        </div>
+                        <div class="field-group">
+                            <label>Пароль клиента (опционально)</label>
+                            <input type="text" name="client_password">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab4" class="tab-section hidden">
+                    <div class="form-grid">
+                        <div class="field-group full-width">
+                            <label>Место работы</label>
+                            <input type="text" name="employer">
+                        </div>
+                        <div class="field-group">
+                            <label>Должность</label>
+                            <input type="text" name="position">
+                        </div>
+                        <div class="field-group">
+                            <label>Сфера деятельности</label>
+                            <input type="text" name="industry">
+                        </div>
+                        <div class="field-group">
+                            <label>Квалификация</label>
+                            <input type="text" name="qualification">
+                        </div>
+                        <div class="field-group">
+                            <label>Зарплата (руб.)</label>
+                            <input type="number" name="salary">
+                        </div>
+                        <div class="field-group">
+                            <label>Прочие доходы</label>
+                            <input type="number" name="other_income">
+                        </div>
+                        <div class="field-group">
+                            <label>Обязательные платежи (руб.)</label>
+                            <input type="number" name="mandatory_payments">
+                        </div>
+                        <div class="field-group">
+                            <label>Чистый доход</label>
+                            <input type="number" name="net_income">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab5" class="tab-section hidden">
+                    <div class="form-grid">
+                        <div class="field-group">
+                            <label>Цель кредита</label>
+                            <input type="text" name="loan_purpose">
+                        </div>
+                        <div class="field-group">
+                            <label>Сумма кредита</label>
+                            <input type="number" name="loan_amount" placeholder="Сумма кредита должна быть положительным числом">
+                        </div>
+                        <div class="field-group">
+                            <label>Валюта кредита</label>
+                            <select name="currency">
+                                <option value="RUB">Российский рубль (RUB)</option>
+                                <option value="USD">Доллар США (USD)</option>
+                                <option value="EUR">Евро (EUR)</option>
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label>Срок (месяцы)</label>
+                            <input type="number" name="loan_term" placeholder="Срок кредита — от 1 до 360 месяцев">
+                        </div>
+                        <div class="field-group">
+                            <label>Процентная ставка (%)</label>
+                            <input type="text" name="interest_rate" placeholder="Ставка должна быть от 0 до 100 %">
+                        </div>
+                        <div class="field-group">
+                            <label>Полная стоимость кредита (%)</label>
+                            <input type="text" name="total_cost_percent">
+                        </div>
+                        <div class="field-group">
+                            <label>Полная стоимость кредита (руб.)</label>
+                            <input type="text" name="total_cost_rub">
+                        </div>
+                        <div class="field-group">
+                            <label>Переплата (руб.)</label>
+                            <input type="text" name="overpayment">
+                        </div>
+                        <div class="field-group">
+                            <label>Неустойка (%)</label>
+                            <input type="text" name="penalty">
+                        </div>
+                        <div class="field-group">
+                            <label>Категория товаров/услуг</label>
+                            <input type="text" name="product_category">
+                        </div>
+                        <div class="field-group">
+                            <label>Общая стоимость товаров/услуг</label>
+                            <input type="text" name="total_product_cost">
+                        </div>
+                        <div class="field-group">
+                            <label>Первоначальный взнос (руб.)</label>
+                            <input type="text" name="initial_fee">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab6" class="tab-section hidden">
+                    <div class="form-grid">
+                        <div class="field-group">
+                            <label>Предмет залога</label>
+                            <input type="text" name="collateral_subject">
+                        </div>
+                        <div class="field-group">
+                            <label>Местонахождение залога</label>
+                            <input type="text" name="collateral_location">
+                        </div>
+                        <div class="field-group">
+                            <label>Место хранения залога</label>
+                            <input type="text" name="collateral_storage">
+                        </div>
+                        <div class="field-group">
+                            <label>Владелец залога</label>
+                            <input type="text" name="collateral_owner">
+                        </div>
+                        <div class="field-group full-width">
+                            <label>Данные поручителя</label>
+                            <textarea name="guarantor_data"></textarea>
+                        </div>
+                        <div class="field-group">
+                            <label>Наличие предыдущих кредитов</label>
+                            <select name="has_previous_loans">
+                                <option value="нет">Нет</option>
+                                <option value="да">Да</option>
+                            </select>
+                        </div>
+                        <div class="field-group full-width">
+                            <label>Детали предыдущих кредитов</label>
+                            <textarea name="previous_loans_details"></textarea>
+                        </div>
+                        <div class="field-group">
+                            <label>Наименование БКИ</label>
+                            <input type="text" name="bki_name">
+                        </div>
+                        <div class="field-group full-width">
+                            <label>Перечень собственности (имущество)</label>
+                            <textarea name="property_list"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab7" class="tab-section hidden">
+                    <div class="form-grid">
+                        <div class="field-group">
+                            <label>Наименование банка</label>
+                            <input type="text" name="bank_name">
+                        </div>
+                        <div class="field-group">
+                            <label>Место нахождения банка</label>
+                            <input type="text" name="bank_location">
+                        </div>
+                        <div class="field-group">
+                            <label>ИНН банка</label>
+                            <input type="text" name="bank_inn">
+                        </div>
+                        <div class="field-group">
+                            <label>БИК</label>
+                            <input type="text" name="bank_bik">
+                        </div>
+                        <div class="field-group">
+                            <label>Корреспондентский счёт</label>
+                            <input type="text" name="correspondent_account">
+                        </div>
+                        <div class="field-group full-width">
+                            <label>Номер счёта клиента</label>
+                            <input type="text" name="client_account">
+                        </div>
+                        <div class="field-group">
+                            <label>Должность сотрудника банка</label>
+                            <input type="text" name="bank_officer_position">
+                        </div>
+                        <div class="field-group">
+                            <label>ФИО сотрудника банка</label>
+                            <input type="text" name="bank_officer_name">
+                        </div>
+                        <div class="field-group">
+                            <label>Основание (Устав / доверенность)</label>
+                            <input type="text" name="authority_basis">
+                        </div>
+                        <div class="field-group">
+                            <label>Текущая дата заполнения</label>
+                            <input type="date" name="current_date" value="2026-06-01">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" class="btn">Заполнить документы</button>
+                    <button type="reset" class="btn btn-secondary">Очистить форму</button>
+                    <button type="button" class="btn btn-exit">Выход</button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2026 Кредитный документооборот: Автозаполнение</p>
+    </footer>
+</div>
+
+<script>
+    const tabItems = document.querySelectorAll('.tab-item');
+    const showAllBtn = document.getElementById('showAllBtn');
+    const tabSections = {
+        tab1: document.getElementById('tab1'),
+        tab2: document.getElementById('tab2'),
+        tab3: document.getElementById('tab3'),
+        tab4: document.getElementById('tab4'),
+        tab5: document.getElementById('tab5'),
+        tab6: document.getElementById('tab6'),
+        tab7: document.getElementById('tab7')
+    };
+
+    function showSingleTab(tabId) {
+        for (const key in tabSections) {
+            if (tabSections[key]) {
+                tabSections[key].classList.add('hidden');
+            }
+        }
+        if (tabSections[tabId]) {
+            tabSections[tabId].classList.remove('hidden');
+        }
+        tabItems.forEach(item => {
+            if (item.getAttribute('data-tab') === tabId) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+    }
+
+    function showAllTabs() {
+        for (const key in tabSections) {
+            if (tabSections[key]) {
+                tabSections[key].classList.remove('hidden');
+            }
+        }
+        tabItems.forEach(item => {
+            item.classList.remove('active');
+        });
+    }
+
+    tabItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const tabId = this.getAttribute('data-tab');
+            showSingleTab(tabId);
+        });
+    });
+
+    showAllBtn.addEventListener('click', function() {
+        showAllTabs();
+    });
+
+    const form = document.getElementById('mainForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            alert('Функциональная часть в разработке. Форма не отправлена.');
+        });
+        
+        const exitBtn = document.querySelector('.btn-exit');
+        if (exitBtn) {
+            exitBtn.addEventListener('click', function() {
+                alert('Выход. Функциональная часть в разработке.');
+            });
+        }
+    }
+</script>
+</body>
+</html>
