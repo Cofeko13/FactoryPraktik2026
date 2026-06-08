@@ -114,5 +114,8 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
-
+# ключи 
 STATIC_URL = 'static/'
+
+DOCX_TEMPLATES_DIR = BASE_DIR / 'creditapp' / 'templates' / 'docx'
+GENERATED_DOCS_DIR = BASE_DIR / 'generated_docs'

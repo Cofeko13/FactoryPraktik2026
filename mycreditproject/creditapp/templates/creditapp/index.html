@@ -125,6 +125,29 @@
             width: 100%;
         }
 
+        .field-group input.error,
+        .field-group select.error,
+        .field-group textarea.error {
+            border: 2px solid #E74C3C;
+        }
+
+        /* Plain inline messages: no colored background or border */
+        .success-message,
+        .error-message {
+            background: transparent;
+            border: none;
+            color: #000000;
+            padding: 8px 0;
+            margin-bottom: 12px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .success-message.visible,
+        .error-message.visible {
+            display: block;
+        }
+
         .field-group textarea {
             resize: vertical;
             min-height: 70px;
@@ -238,7 +261,13 @@
         <div class="form-card">
             <h2 class="form-title">Автоматическое заполнение кредитных документов</h2>
 
-            <form id="mainForm">
+            <div id="successMessage" class="success-message">
+                Документы успешно созданы и загружены. Архив содержит 5 заполненных файлов .docx.
+            </div>
+            <div id="errorMessage" class="error-message"></div>
+
+            <form id="mainForm" method="post" action="{% url 'generate' %}">
+                {% csrf_token %}
                 <div id="tab1" class="tab-section">
                     <div class="form-grid">
                         <div class="field-group">
@@ -273,6 +302,16 @@
                                 <option value="женат/замужем">Женат/Замужем</option>
                                 <option value="разведен(а)">Разведен(а)</option>
                                 <option value="вдовец/вдова">Вдовец/Вдова</option>
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label>Число лиц на иждивении</label>
+                            <select name="dependents">
+                                <option value="0">Нет</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">Более трёх</option>
                             </select>
                         </div>
                     </div>
@@ -518,7 +557,7 @@
                         </div>
                         <div class="field-group">
                             <label>Текущая дата заполнения</label>
-                            <input type="date" name="current_date" value="2026-06-01">
+                            <input type="date" name="current_date" id="currentDate">
                         </div>
                     </div>
                 </div>
@@ -550,6 +589,11 @@
         tab7: document.getElementById('tab7')
     };
 
+    const FIO_PATTERN = /^[\sа-яА-ЯёЁa-zA-Z\-]+$/;
+    const DEPT_CODE_PATTERN = /^\d{3}-\d{3}$/;
+    const INN_PATTERN = /^\d{12}$/;
+    const SNILS_PATTERN = /^\d{3}-\d{3}-\d{3} \d{2}$/;
+
     function showSingleTab(tabId) {
         for (const key in tabSections) {
             if (tabSections[key]) {
@@ -566,6 +610,8 @@
                 item.classList.remove('active');
             }
         });
+        // adjust layout to avoid vertical jump when switching tabs
+        if (typeof window.updateFormCardMinHeight === 'function') window.updateFormCardMinHeight();
     }
 
     function showAllTabs() {
@@ -577,30 +623,225 @@
         tabItems.forEach(item => {
             item.classList.remove('active');
         });
+        // adjust layout when showing all
+        if (typeof window.updateFormCardMinHeight === 'function') window.updateFormCardMinHeight();
     }
 
     tabItems.forEach(item => {
         item.addEventListener('click', function() {
-            const tabId = this.getAttribute('data-tab');
-            showSingleTab(tabId);
+            showSingleTab(this.getAttribute('data-tab'));
         });
     });
 
-    showAllBtn.addEventListener('click', function() {
-        showAllTabs();
-    });
+    showAllBtn.addEventListener('click', showAllTabs);
+
+    const currentDateInput = document.getElementById('currentDate');
+    if (currentDateInput) {
+        currentDateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    function clearErrors() {
+        document.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
+        document.getElementById('errorMessage').classList.remove('visible');
+        document.getElementById('successMessage').classList.remove('visible');
+    }
+
+    function markError(field, message) {
+        const el = form.querySelector('[name="' + field + '"]');
+        if (el) {
+            el.classList.add('error');
+            el.title = message;
+        }
+        return message;
+    }
+
+    function validateForm() {
+        clearErrors();
+        const errors = [];
+        const data = new FormData(form);
+
+        function checkFio(name, required) {
+            const val = (data.get(name) || '').trim();
+            if (!val) {
+                if (required) errors.push(markError(name, 'ФИО должно содержать только буквы и пробелы'));
+                return;
+            }
+            if (!FIO_PATTERN.test(val)) {
+                errors.push(markError(name, 'ФИО должно содержать только буквы и пробелы'));
+            }
+        }
+
+        checkFio('lastname', true);
+        checkFio('firstname', true);
+        checkFio('middlename', false);
+        checkFio('bank_officer_name', false);
+
+        const birthdate = data.get('birthdate');
+        if (!birthdate) {
+            errors.push(markError('birthdate', 'Укажите корректную дату рождения'));
+        } else {
+            const birth = new Date(birthdate);
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+            if (age < 18 || age > 120) {
+                errors.push(markError('birthdate', 'Укажите корректную дату рождения'));
+            }
+        }
+
+        const deptCode = (data.get('department_code') || '').trim();
+        if (deptCode && !DEPT_CODE_PATTERN.test(deptCode)) {
+            errors.push(markError('department_code', 'Код подразделения должен быть в формате xxx-xxx'));
+        }
+
+        const inn = (data.get('inn') || '').trim();
+        if (inn && !INN_PATTERN.test(inn)) {
+            errors.push(markError('inn', 'ИНН должен состоять из 12 цифр'));
+        }
+
+        const snils = (data.get('snils') || '').trim();
+        if (snils && !SNILS_PATTERN.test(snils)) {
+            errors.push(markError('snils', 'СНИЛС должен быть в формате xxx-xxx-xxx xx'));
+        }
+
+        const loanAmount = (data.get('loan_amount') || '').trim();
+        if (loanAmount) {
+            const num = parseFloat(loanAmount);
+            if (isNaN(num) || num <= 0) {
+                errors.push(markError('loan_amount', 'Сумма кредита должна быть положительным числом'));
+            }
+        }
+
+        const rate = (data.get('interest_rate') || '').trim().replace(',', '.');
+        if (rate) {
+            const num = parseFloat(rate);
+            if (isNaN(num) || num < 0 || num > 100) {
+                errors.push(markError('interest_rate', 'Ставка должна быть от 0 до 100 %'));
+            }
+        }
+
+        const term = (data.get('loan_term') || '').trim();
+        if (term) {
+            const num = parseInt(term, 10);
+            if (isNaN(num) || num < 1 || num > 360) {
+                errors.push(markError('loan_term', 'Срок кредита — от 1 до 360 месяцев'));
+            }
+        }
+
+        return errors;
+    }
 
     const form = document.getElementById('mainForm');
     if (form) {
-        form.addEventListener('submit', function(e) {
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
-            alert('Функциональная часть в разработке. Форма не отправлена.');
+            const validationErrors = validateForm();
+            if (validationErrors.length > 0) {
+                const errorBox = document.getElementById('errorMessage');
+                errorBox.textContent = 'Исправьте ошибки в форме. Наведите курсор на поле с красной рамкой.';
+                errorBox.classList.add('visible');
+                return;
+            }
+
+            const submitBtn = form.querySelector('[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Генерация...';
+
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+
+                if (!response.ok) {
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        const result = await response.json();
+                        if (result.errors) {
+                            Object.entries(result.errors).forEach(([field, msg]) => {
+                                if (field !== '_form') markError(field, msg);
+                            });
+                            const errorBox = document.getElementById('errorMessage');
+                            errorBox.textContent = result.errors._form || 'Исправьте ошибки в форме.';
+                            errorBox.classList.add('visible');
+                        }
+                    } else {
+                        document.getElementById('errorMessage').textContent = 'Ошибка сервера при генерации документов.';
+                        document.getElementById('errorMessage').classList.add('visible');
+                    }
+                    return;
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'kreditnye_dokumenty.zip';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+                document.getElementById('successMessage').classList.add('visible');
+            } catch (err) {
+                document.getElementById('errorMessage').textContent = 'Ошибка сети: ' + err.message;
+                document.getElementById('errorMessage').classList.add('visible');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Заполнить документы';
+            }
         });
-        
+
+        form.addEventListener('input', function(e) {
+            if (e.target.classList.contains('error')) {
+                e.target.classList.remove('error');
+                e.target.removeAttribute('title');
+            }
+        });
+
+        form.addEventListener('reset', function() {
+            clearErrors();
+            if (currentDateInput) {
+                currentDateInput.value = new Date().toISOString().split('T')[0];
+            }
+        });
+
+        // compute and set a minimum height for the form card to avoid content jumping
+        window.updateFormCardMinHeight = function() {
+            try {
+                const sections = Object.values(tabSections).filter(Boolean);
+                let maxH = 0;
+                sections.forEach(s => {
+                    // temporarily ensure visible for measurement
+                    const prev = s.classList.contains('hidden');
+                    if (prev) s.classList.remove('hidden');
+                    const h = s.scrollHeight;
+                    if (h > maxH) maxH = h;
+                    if (prev) s.classList.add('hidden');
+                });
+                const card = document.querySelector('.form-card');
+                if (card) {
+                    // add some space for title and padding
+                    card.style.minHeight = (maxH + 160) + 'px';
+                }
+            } catch (e) {
+                // silent
+            }
+        };
+
+        // update on load and on resize
+        window.addEventListener('load', updateFormCardMinHeight);
+        window.addEventListener('resize', function() { setTimeout(updateFormCardMinHeight, 120); });
+
         const exitBtn = document.querySelector('.btn-exit');
         if (exitBtn) {
             exitBtn.addEventListener('click', function() {
-                alert('Выход. Функциональная часть в разработке.');
+                if (confirm('Вы уверены, что хотите выйти?')) {
+                    window.close();
+                    window.location.href = 'about:blank';
+                }
             });
         }
     }
